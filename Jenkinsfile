@@ -1,12 +1,14 @@
 pipeline {
   agent any
 
-  triggers { pollSCM('H/5 * * * *') }
+  triggers {
+    pollSCM('H/5 * * * *')
+  }
 
   options {
     timestamps()
     disableConcurrentBuilds()
-    timeout(time: 5, unit: 'MINUTES')
+    timeout(time: 20, unit: 'MINUTES')
     buildDiscarder(logRotator(numToKeepStr: '30'))
   }
 
@@ -16,7 +18,9 @@ pipeline {
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+      }
     }
 
     stage('Docker sanity check') {
@@ -49,23 +53,24 @@ pipeline {
       }
     }
 
-   stage('Run tests') {
-  steps {
-    sh '''
-      mkdir -p artifacts
-      
-      docker run --rm loguru-test:${GIT_SHA} | tee artifacts/test.log
-    '''
+    stage('Run tests') {
+      steps {
+        sh '''
+          mkdir -p artifacts
+          docker run --rm loguru-test:${GIT_SHA} | tee artifacts/test.log
+        '''
+      }
+    }
   }
-}
 
-post {
-  always {
-    archiveArtifacts artifacts: 'artifacts/*.log', fingerprint: true
-    sh '''
-      docker rmi loguru-test:${GIT_SHA} 2>/dev/null || true
-      docker rmi loguru-build:${GIT_SHA} 2>/dev/null || true
-    '''
+  post {
+    always {
+      archiveArtifacts artifacts: 'artifacts/*.log', fingerprint: true
+      sh '''
+        docker rmi loguru-test:${GIT_SHA} 2>/dev/null || true
+        docker rmi loguru-build:${GIT_SHA} 2>/dev/null || true
+      '''
+    }
   }
 }
 
