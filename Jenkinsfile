@@ -6,6 +6,8 @@ pipeline {
   options {
     timestamps()
     disableConcurrentBuilds()
+    timeout(time: 5, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '30'))
   }
 
   environment {
@@ -19,18 +21,15 @@ pipeline {
 
     stage('Docker sanity check') {
       steps {
-        sh '''
-          docker version
-          docker info
-        '''
+        sh 'docker version'
+        sh 'docker info'
       }
     }
 
-    stage('Build base image (build)') {
+    stage('Build build-image') {
       steps {
         sh '''
-          docker build \
-            -f Dockerfile.build \
+          docker build -f Dockerfile.build \
             -t loguru-build:${GIT_SHA} \
             -t loguru-build:latest \
             .
@@ -38,29 +37,35 @@ pipeline {
       }
     }
 
-    stage('Build test image & Run tests') {
+    stage('Build test-image') {
       steps {
         sh '''
-          docker build \
-            -f Dockerfile.test \
+          docker build -f Dockerfile.test \
             --build-arg BASE_IMAGE=loguru-build:${GIT_SHA} \
             -t loguru-test:${GIT_SHA} \
             -t loguru-test:latest \
             .
-
-          docker run --rm loguru-test:${GIT_SHA}
         '''
       }
     }
-  }
 
-  post {
-    always {
-      sh '''
-        docker rmi loguru-test:${GIT_SHA} 2>/dev/null || true
-        docker rmi loguru-build:${GIT_SHA} 2>/dev/null || true
-      '''
-    }
+   stage('Run tests') {
+  steps {
+    sh '''
+      mkdir -p artifacts
+      
+      docker run --rm loguru-test:${GIT_SHA} | tee artifacts/test.log
+    '''
+  }
+}
+
+post {
+  always {
+    archiveArtifacts artifacts: 'artifacts/*.log', fingerprint: true
+    sh '''
+      docker rmi loguru-test:${GIT_SHA} 2>/dev/null || true
+      docker rmi loguru-build:${GIT_SHA} 2>/dev/null || true
+    '''
   }
 }
 
