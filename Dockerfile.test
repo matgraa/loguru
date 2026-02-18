@@ -1,0 +1,15 @@
+# Dockerfile.test
+ARG BASE_IMAGE=loguru-build:latest
+FROM ${BASE_IMAGE}
+
+WORKDIR /app
+
+# Jeśli chcesz testować dokładnie to co przyszło z SCM w tym buildzie,
+# to możesz nadpisać źródła (zwykle warto):
+COPY . /app
+
+# Dev deps są już w BASE_IMAGE, ale to jest bezpieczne (i szybkie, jeśli cache)
+RUN pip install --no-cache-dir -e ".[dev]"
+
+CMD ["pytest", "-q"]
+

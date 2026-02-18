@@ -1,0 +1,26 @@
+# Dockerfile.build
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# (opcjonalnie) git bywa przydatny w CI, ale jeśli nie potrzebujesz, możesz usunąć
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git \
+ && rm -rf /var/lib/apt/lists/*
+
+# Najpierw metadane -> lepszy cache
+COPY pyproject.toml README.md LICENSE* /app/
+
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir "flit_core>=3,<4"
+
+# Potem reszta źródeł
+COPY . /app
+
+# Instalujemy zależności dev (pytest, tox, mypy itd.)
+RUN pip install --no-cache-dir -e ".[dev]"
+

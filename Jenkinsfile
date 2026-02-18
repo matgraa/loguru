@@ -1,27 +1,28 @@
-// Jenkinsfile (bez deploy)
 pipeline {
   agent any
+
+  triggers { pollSCM('H/5 * * * *') }
 
   options {
     timestamps()
     disableConcurrentBuilds()
   }
 
-  triggers {
-    // Poll SCM co 5 minut
-    pollSCM('H/5 * * * *')
-  }
-
   environment {
-    // krótki SHA do tagów obrazów
     GIT_SHA = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'local'}"
   }
 
   stages {
     stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Docker sanity check') {
       steps {
-        checkout scm
-        sh 'git rev-parse --short HEAD'
+        sh '''
+          docker version
+          docker info
+        '''
       }
     }
 
@@ -29,7 +30,7 @@ pipeline {
       steps {
         sh '''
           docker build \
-            -f Dockerfile \
+            -f Dockerfile.build \
             -t loguru-build:${GIT_SHA} \
             -t loguru-build:latest \
             .
@@ -42,6 +43,7 @@ pipeline {
         sh '''
           docker build \
             -f Dockerfile.test \
+            --build-arg BASE_IMAGE=loguru-build:${GIT_SHA} \
             -t loguru-test:${GIT_SHA} \
             -t loguru-test:latest \
             .
@@ -55,14 +57,10 @@ pipeline {
   post {
     always {
       sh '''
-        docker image prune -f || true
+        docker rmi loguru-test:${GIT_SHA} 2>/dev/null || true
+        docker rmi loguru-build:${GIT_SHA} 2>/dev/null || true
       '''
-    }
-    success {
-      echo "OK: build + test zakończone."
-    }
-    failure {
-      echo "FAIL: build lub testy nie przeszły."
     }
   }
 }
+
