@@ -67,7 +67,7 @@ pipeline {
     }
 
     stage('Tag & Push to Docker Hub') {
-      when { branch 'master' }
+      
 
       steps {
         sh '''
